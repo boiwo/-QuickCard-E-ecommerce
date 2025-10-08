@@ -1,84 +1,109 @@
-# seed.py
-import random
 from app import app
 from models import db, Category, Product, User, CartItem
 from werkzeug.security import generate_password_hash
 
-# ✅ Sample categories
-sample_categories = ["Laptops", "Phones", "Accessories"]
+# -----------------------------
+# PRODUCT DATA (CLEAN + WORKING IMAGE LINKS)
+# -----------------------------
+products = [
+    {
+        "name": "MacBook Air M2",
+        "price": 1199.99,
+        "stock": 10,
+        "description": "Apple MacBook Air M2 with 13-inch Retina Display and long battery life.",
+        "category": "Laptops",
+        "image_url": "https://images.pexels.com/photos/18105/pexels-photo.jpg?auto=compress&cs=tinysrgb&w=800"
+    },
+    {
+        "name": "Dell XPS 13",
+        "price": 1099.99,
+        "stock": 8,
+        "description": "Dell XPS 13 Ultrabook with InfinityEdge Display and sleek aluminum design.",
+        "category": "Laptops",
+        "image_url": "https://images.pexels.com/photos/374074/pexels-photo-374074.jpeg?auto=compress&cs=tinysrgb&w=800"
+    },
+    {
+        "name": "iPhone 15 Pro",
+        "price": 999.99,
+        "stock": 20,
+        "description": "Apple iPhone 15 Pro with A17 chip and advanced camera system.",
+        "category": "Phones",
+        "image_url": "https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg?auto=compress&cs=tinysrgb&w=800"
+    },
+    {
+        "name": "Samsung Galaxy S24",
+        "price": 899.99,
+        "stock": 15,
+        "description": "Samsung Galaxy S24 with AI-enhanced photography and AMOLED display.",
+        "category": "Phones",
+        "image_url": "https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg?auto=compress&cs=tinysrgb&w=800"
+    },
+    {
+        "name": "Sony WH-1000XM5",
+        "price": 399.99,
+        "stock": 25,
+        "description": "Sony Wireless Noise Cancelling Headphones with immersive sound.",
+        "category": "Accessories",
+        "image_url": "https://images.pexels.com/photos/3394655/pexels-photo-3394655.jpeg?auto=compress&cs=tinysrgb&w=800"
+    },
+    {
+        "name": "Apple Watch Series 9",
+        "price": 499.99,
+        "stock": 18,
+        "description": "Apple Watch Series 9 with S9 chip and advanced fitness tracking.",
+        "category": "Accessories",
+        "image_url": "https://images.pexels.com/photos/267394/pexels-photo-267394.jpeg?auto=compress&cs=tinysrgb&w=800"
+    }
+]
 
-# ✅ Random sample data
-laptop_names = ["MacBook Air", "MacBook Pro", "Dell XPS 13", "HP Spectre", "Lenovo ThinkPad"]
-phone_names = ["iPhone 15", "Samsung Galaxy S24", "Google Pixel 8", "OnePlus 12", "Xiaomi 14"]
-accessory_names = ["Wireless Mouse", "Mechanical Keyboard", "Bluetooth Headphones", "USB-C Hub", "Portable SSD"]
-
-image_urls = {
-    "Laptops": "https://images.pexels.com/photos/18105/pexels-photo.jpg",
-    "Phones": "https://images.pexels.com/photos/5077046/pexels-photo-5077046.jpeg",
-    "Accessories": "https://images.pexels.com/photos/38316/mouse-computer-technology-wireless-38316.jpeg",
-}
-
-def random_price(category):
-    if category == "Laptops":
-        return round(random.uniform(800, 2000), 2)
-    elif category == "Phones":
-        return round(random.uniform(400, 1500), 2)
-    else:
-        return round(random.uniform(10, 200), 2)
-
-def random_stock():
-    return random.randint(3, 20)
-
-def random_rating():
-    return round(random.uniform(3.5, 5.0), 1)
-
+# -----------------------------
+# SEED SCRIPT
+# -----------------------------
 with app.app_context():
     print("🔄 Resetting database...")
     db.drop_all()
     db.create_all()
 
-    # ✅ Create categories dynamically
+    # Add categories dynamically
     categories = {}
-    for name in sample_categories:
-        cat = Category(name=name)
-        db.session.add(cat)
-        categories[name] = cat
+    for p in products:
+        cat_name = p["category"]
+        if cat_name not in categories:
+            cat = Category(name=cat_name)
+            db.session.add(cat)
+            db.session.flush()
+            categories[cat_name] = cat
+
     db.session.commit()
 
-    # ✅ Create 20 products dynamically
-    all_products = (
-        [(n, "Laptops") for n in laptop_names] +
-        [(n, "Phones") for n in phone_names] +
-        [(n, "Accessories") for n in accessory_names]
-    )
-
-    # Duplicate some products to reach ~20 items
-    while len(all_products) < 20:
-        all_products.append(random.choice(all_products))
-
-    for name, category in all_products:
-        product = Product(
-            name=name,
-            description=f"{name} - High-quality {category.lower()} with modern features.",
-            price=random_price(category),
-            stock=random_stock(),
-            image_url=image_urls[category],
-            rating=random_rating(),
-            category_id=categories[category].id,
+    # Add products
+    for item in products:
+        p = Product(
+            name=item["name"],
+            description=item["description"],
+            price=item["price"],
+            stock=item["stock"],
+            image_url=item["image_url"],
+            rating=4.8,
+            category_id=categories[item["category"]].id,
         )
-        db.session.add(product)
+        db.session.add(p)
     db.session.commit()
 
-    # ✅ Demo user
-    demo = User(name="Demo User", email="demo@example.com", password_hash=generate_password_hash("password"))
-    db.session.add(demo)
+    # Add demo user
+    demo_user = User(
+        name="Demo User",
+        email="demo@example.com",
+        password_hash=generate_password_hash("password"),
+    )
+    db.session.add(demo_user)
     db.session.commit()
 
-    # ✅ Add 1 product to demo cart
+    # Add a sample cart item
     first_product = Product.query.first()
     if first_product:
-        ci = CartItem(user_id=demo.id, product_id=first_product.id, quantity=1)
-        db.session.add(ci)
+        cart_item = CartItem(user_id=demo_user.id, product_id=first_product.id, quantity=1)
+        db.session.add(cart_item)
         db.session.commit()
 
-    print("✅ Seeded 20 products, 3 categories, and 1 demo user (demo@example.com / password)")
+    print("✅ Seeded database successfully with working images!")

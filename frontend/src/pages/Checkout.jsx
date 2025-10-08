@@ -44,6 +44,14 @@ const Checkout = () => {
       return;
     }
 
+    // Validate required fields
+    for (const key of ['fullName', 'email', 'phone', 'address', 'city', 'state', 'zipCode', 'country']) {
+      if (!formData[key]) {
+        alert('Please fill in all required fields.');
+        return;
+      }
+    }
+
     setProcessing(true);
 
     const subtotal = getCartTotal();
@@ -67,11 +75,12 @@ const Checkout = () => {
       return;
     }
 
+    // Support both item.products and item for price
     const orderItems = cartItems.map(item => ({
       order_id: orderData.id,
       product_id: item.product_id,
       quantity: item.quantity,
-      price: item.products.price
+      price: item.products?.price || item.price
     }));
 
     const { error: itemsError } = await supabase
@@ -86,6 +95,7 @@ const Checkout = () => {
 
     await clearCart();
 
+    alert('Order placed successfully!');
     navigate(`/order-confirmation/${orderData.id}`);
   };
 
@@ -261,16 +271,20 @@ const Checkout = () => {
                 <h2>Order Summary</h2>
 
                 <div className="summary-items">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="summary-item">
-                      <span className="item-name">
-                        {item.products.name} × {item.quantity}
-                      </span>
-                      <span className="item-price">
-                        ${(parseFloat(item.products.price) * item.quantity).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
+                  {cartItems.map((item) => {
+                    const name = item.products?.name || item.name;
+                    const price = item.products?.price || item.price;
+                    return (
+                      <div key={item.id} className="summary-item">
+                        <span className="item-name">
+                          {name} × {item.quantity}
+                        </span>
+                        <span className="item-price">
+                          ${(parseFloat(price) * item.quantity).toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="summary-totals">
@@ -307,3 +321,5 @@ const Checkout = () => {
 };
 
 export default Checkout;
+
+

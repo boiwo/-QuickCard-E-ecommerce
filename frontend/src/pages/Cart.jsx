@@ -1,18 +1,32 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
+// src/pages/Cart.jsx
+import { Link, useNavigate } from "react-router-dom";
+import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
 
 const Cart = () => {
   const { user } = useAuth();
-  const { cartItems, updateQuantity, removeFromCart, getCartTotal, loading } = useCart();
+  const {
+    cartItems,
+    updateQuantity,
+    removeFromCart,
+    getCartTotal,
+    loading,
+  } = useCart();
   const navigate = useNavigate();
 
   const handleCheckout = () => {
     if (!user) {
-      navigate('/login?redirect=/checkout');
+      alert('Please login to proceed to checkout.');
+      navigate("/login?redirect=/checkout");
       return;
     }
-    navigate('/checkout');
+    // Only navigate to checkout if cart is not empty
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      alert('Your cart is empty. Add products before checking out.');
+      navigate('/shop');
+      return;
+    }
+    navigate("/checkout");
   };
 
   if (loading) {
@@ -24,7 +38,8 @@ const Cart = () => {
     );
   }
 
-  if (cartItems.length === 0) {
+  // ✅ Safety: Ensure cartItems is an array
+  if (!Array.isArray(cartItems) || cartItems.length === 0) {
     return (
       <div className="container">
         <div className="empty-cart">
@@ -48,94 +63,89 @@ const Cart = () => {
       <div className="container">
         <h1>Shopping Cart</h1>
 
-        <div className="cart-content">
-          <div className="cart-items">
+        <div className="cart-content" style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', alignItems: 'flex-start', justifyContent: 'center' }}>
+          <div className="cart-items" style={{ flex: '2 1 400px', minWidth: '320px' }}>
             {cartItems.map((item) => {
-              const images = Array.isArray(item.products.images) ? item.products.images : [];
-              const imageUrl = images.length > 0 ? images[0] : 'https://via.placeholder.com/100';
+              const product = item.products || item;
+              const imageUrl = Array.isArray(product.images)
+                ? product.images[0]
+                : product.image_url || "https://via.placeholder.com/150";
 
               return (
-                <div key={item.id} className="cart-item">
-                  <Link to={`/product/${item.products.slug}`} className="item-image">
-                    <img src={imageUrl} alt={item.products.name} />
-                  </Link>
-
-                  <div className="item-details">
-                    <Link to={`/product/${item.products.slug}`} className="item-name">
-                      {item.products.name}
+                <div key={product.id} className="cart-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', padding: '1.5rem', marginBottom: '1.5rem', maxWidth: '400px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <Link to={`/product/${product.slug || product.id}`} className="item-image">
+                      <img src={imageUrl} alt={product.name} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px' }} />
                     </Link>
-                    <p className="item-description">{item.products.short_description}</p>
-                    <p className="item-price">${parseFloat(item.products.price).toFixed(2)}</p>
+                    <div>
+                      <Link to={`/product/${product.slug || product.id}`} className="item-name" style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#2d3748' }}>
+                        {product.name}
+                      </Link>
+                      <p className="item-description" style={{ color: '#4a5568', fontSize: '0.95rem', margin: '0.25rem 0' }}>
+                        {product.short_description || product.description}
+                      </p>
+                      <p className="item-price" style={{ fontWeight: 'bold', color: '#3182ce', fontSize: '1.1rem' }}>
+                        ${parseFloat(product.price).toFixed(2)}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="item-quantity">
-                    <label>Quantity:</label>
-                    <div className="quantity-controls">
+                  <div className="item-quantity" style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                    <span style={{ fontWeight: 'bold', color: '#2d3748' }}>Quantity:</span>
+                    <div className="quantity-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        onClick={() => updateQuantity(product.id, item.quantity - 1)}
+                        style={{ padding: '0.25rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e0', background: '#edf2f7', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}
                       >
                         -
                       </button>
                       <input
                         type="number"
                         value={item.quantity}
-                        onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
+                        onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 1)}
                         min="1"
-                        max={item.products.stock}
+                        max={product.stock}
+                        style={{ width: '40px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e0', fontSize: '1rem' }}
                       />
                       <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        disabled={item.quantity >= item.products.stock}
+                        onClick={() => updateQuantity(product.id, item.quantity + 1)}
+                        disabled={item.quantity >= product.stock}
+                        style={{ padding: '0.25rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e0', background: '#edf2f7', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}
                       >
                         +
                       </button>
                     </div>
+                    <span style={{ fontWeight: 'bold', color: '#3182ce', marginLeft: 'auto' }}>${(product.price * item.quantity).toFixed(2)}</span>
                   </div>
 
-                  <div className="item-total">
-                    <p className="item-total-price">
-                      ${(parseFloat(item.products.price) * item.quantity).toFixed(2)}
-                    </p>
-                    <button
-                      className="btn-remove"
-                      onClick={() => removeFromCart(item.id)}
-                    >
-                      Remove
-                    </button>
-                  </div>
+                  <button
+                    className="btn-remove"
+                    onClick={() => removeFromCart(product.id)}
+                    style={{ marginTop: '0.5rem', background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  >
+                    Remove
+                  </button>
                 </div>
               );
             })}
           </div>
 
-          <div className="cart-summary">
+          <div className="cart-summary" style={{ flex: '1 1 320px', minWidth: '280px', background: '#f7fafc', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', padding: '2rem', marginLeft: 'auto', marginTop: '0' }}>
             <h2>Order Summary</h2>
-
             <div className="summary-row">
               <span>Subtotal:</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
-
             <div className="summary-row">
               <span>Shipping:</span>
-              <span>{shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}</span>
+              <span>{shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`}</span>
             </div>
-
-            {subtotal < 50 && (
-              <p className="shipping-notice">
-                Add ${(50 - subtotal).toFixed(2)} more to get free shipping!
-              </p>
-            )}
-
             <div className="summary-row summary-total">
               <span>Total:</span>
               <span>${total.toFixed(2)}</span>
             </div>
 
-            <button
-              className="btn btn-primary btn-large"
-              onClick={handleCheckout}
-            >
+            <button className="btn btn-primary btn-large" onClick={handleCheckout}>
               Proceed to Checkout
             </button>
 
@@ -149,4 +159,3 @@ const Cart = () => {
   );
 };
 
-export default Cart;

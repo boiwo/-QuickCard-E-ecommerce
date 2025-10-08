@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import ProductCard from '../components/ProductCard';
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import ProductCard from "../components/ProductCard";
 
 const Home = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const API_BASE = "http://127.0.0.1:5000/api"; // Flask backend base URL
 
   useEffect(() => {
     fetchData();
@@ -16,54 +17,60 @@ const Home = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    const [productsResult, categoriesResult] = await Promise.all([
-      supabase
-        .from('products')
-        .select('*')
-        .eq('featured', true)
-        .limit(8),
-      supabase
-        .from('categories')
-        .select('*')
-        .limit(6)
-    ]);
+    try {
+      // Fetch featured products and categories simultaneously
+      const [productsRes, categoriesRes] = await Promise.all([
+        fetch(`${API_BASE}/products`),
+        fetch(`${API_BASE}/categories`),
+      ]);
 
-    if (productsResult.data) setFeaturedProducts(productsResult.data);
-    if (categoriesResult.data) setCategories(categoriesResult.data);
+      const productsData = await productsRes.json();
+      const categoriesData = await categoriesRes.json();
+
+      // Show only 8 featured items (you can change logic as needed)
+      const featured = productsData.filter((p) => p.featured).slice(0, 8);
+
+      setFeaturedProducts(featured);
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
 
     setLoading(false);
   };
 
+  // Hero carousel slides
   const slides = [
     {
-      title: 'Summer Sale',
-      subtitle: 'Up to 50% off on selected items',
-      cta: 'Shop Now',
-      link: '/shop',
-      bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      title: "Summer Sale",
+      subtitle: "Up to 50% off on selected items",
+      cta: "Shop Now",
+      link: "/shop",
+      bg: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
     },
     {
-      title: 'New Arrivals',
-      subtitle: 'Discover the latest trends',
-      cta: 'Explore',
-      link: '/shop',
-      bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+      title: "New Arrivals",
+      subtitle: "Discover the latest trends",
+      cta: "Explore",
+      link: "/shop",
+      bg: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
     },
     {
-      title: 'Free Shipping',
-      subtitle: 'On orders over $50',
-      cta: 'Learn More',
-      link: '/shop',
-      bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
-    }
+      title: "Free Shipping",
+      subtitle: "On orders over $50",
+      cta: "Learn More",
+      link: "/shop",
+      bg: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+    },
   ];
 
+  // Auto-slide every 5 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [slides.length]);
 
   if (loading) {
     return (
@@ -76,12 +83,13 @@ const Home = () => {
 
   return (
     <div className="home-page">
+      {/* HERO SECTION */}
       <section className="hero-section">
         <div className="hero-slider">
           {slides.map((slide, index) => (
             <div
               key={index}
-              className={`hero-slide ${index === currentSlide ? 'active' : ''}`}
+              className={`hero-slide ${index === currentSlide ? "active" : ""}`}
               style={{ background: slide.bg }}
             >
               <div className="container">
@@ -100,13 +108,14 @@ const Home = () => {
           {slides.map((_, index) => (
             <button
               key={index}
-              className={`dot ${index === currentSlide ? 'active' : ''}`}
+              className={`dot ${index === currentSlide ? "active" : ""}`}
               onClick={() => setCurrentSlide(index)}
             />
           ))}
         </div>
       </section>
 
+      {/* CATEGORY SECTION */}
       <section className="categories-section">
         <div className="container">
           <h2 className="section-title">Shop by Category</h2>
@@ -114,12 +123,12 @@ const Home = () => {
             {categories.map((category) => (
               <Link
                 key={category.id}
-                to={`/shop?category=${category.slug}`}
+                to={`/shop?category=${category.name}`}
                 className="category-card"
               >
                 <div className="category-image">
                   <img
-                    src={category.image_url || 'https://via.placeholder.com/200'}
+                    src={category.image_url || "https://via.placeholder.com/200"}
                     alt={category.name}
                   />
                 </div>
@@ -130,6 +139,7 @@ const Home = () => {
         </div>
       </section>
 
+      {/* FEATURED PRODUCTS */}
       <section className="featured-section">
         <div className="container">
           <div className="section-header">
@@ -139,13 +149,18 @@ const Home = () => {
             </Link>
           </div>
           <div className="products-grid">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+            {featuredProducts.length > 0 ? (
+              featuredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))
+            ) : (
+              <p>No featured products found.</p>
+            )}
           </div>
         </div>
       </section>
 
+      {/* FEATURES SECTION */}
       <section className="features-section">
         <div className="container">
           <div className="features-grid">
@@ -177,3 +192,4 @@ const Home = () => {
 };
 
 export default Home;
+

@@ -1,136 +1,56 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from './AuthContext';
+import { createContext, useContext, useState, useEffect } from "react";
 
-const CartContext = createContext({});
-
-export const useCart = () => {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error('useCart must be used within CartProvider');
-  }
-  return context;
-};
+const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-  const { user } = useAuth();
-  const [cartItems, setCartItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [cart, setCart] = useState([]);
 
-  const fetchCart = async () => {
-    if (!user) {
-      setCartItems([]);
-      return;
-    }
-
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('cart_items')
-      .select(`
-        *,
-        products (*)
-      `)
-      .eq('user_id', user.id);
-
-    if (!error && data) {
-      setCartItems(data);
-    }
-    setLoading(false);
-  };
-
+  // Load from localStorage
   useEffect(() => {
-    fetchCart();
-  }, [user]);
+    const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
+    setCart(savedCart);
+  }, []);
 
-  const addToCart = async (productId, quantity = 1) => {
-    if (!user) {
-      alert('Please login to add items to cart');
-      return;
-    }
+  // Save to localStorage
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
 
-    const existingItem = cartItems.find(item => item.product_id === productId);
-
-    if (existingItem) {
-      const { error } = await supabase
-        .from('cart_items')
-        .update({ quantity: existingItem.quantity + quantity })
-        .eq('id', existingItem.id);
-
-      if (!error) {
-        await fetchCart();
+  // Add to cart
+  const addToCart = (product) => {
+    setCart((prev) => {
+      const existing = prev.find((item) => item.id === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
       }
-    } else {
-      const { error } = await supabase
-        .from('cart_items')
-        .insert({ user_id: user.id, product_id: productId, quantity });
-
-      if (!error) {
-        await fetchCart();
-      }
-    }
+      return [...prev, { ...product, quantity: 1 }];
+    });
   };
 
-  const updateQuantity = async (itemId, quantity) => {
-    if (quantity <= 0) {
-      await removeFromCart(itemId);
-      return;
-    }
+  const removeFromCart = (id) => setCart((prev) => prev.filter((i) => i.id !== id));
+  const clearCart = () => setCart([]);
+  const getCartCount = () => cart.reduce((t, i) => t + i.quantity, 0);
+  const getCartTotal = () => cart.reduce((t, i) => t + i.price * i.quantity, 0);
 
-    const { error } = await supabase
-      .from('cart_items')
-      .update({ quantity })
-      .eq('id', itemId);
-
-    if (!error) {
-      await fetchCart();
-    }
-  };
-
-  const removeFromCart = async (itemId) => {
-    const { error } = await supabase
-      .from('cart_items')
-      .delete()
-      .eq('id', itemId);
-
-    if (!error) {
-      await fetchCart();
-    }
-  };
-
-  const clearCart = async () => {
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('cart_items')
-      .delete()
-      .eq('user_id', user.id);
-
-    if (!error) {
-      setCartItems([]);
-    }
-  };
-
-  const getCartTotal = () => {
-    return cartItems.reduce((total, item) => {
-      return total + (parseFloat(item.products.price) * item.quantity);
-    }, 0);
-  };
-
-  const getCartCount = () => {
-    return cartItems.reduce((count, item) => count + item.quantity, 0);
-  };
-
-  const value = {
-    cartItems,
-    loading,
-    addToCart,
-    updateQuantity,
-    removeFromCart,
-    clearCart,
-    getCartTotal,
-    getCartCount,
-    fetchCart,
-  };
-
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return (
+    <CartContext.Provider
+      value={{
+        cart,
+        addToCart,
+        removeFromCart,
+        clearCart,
+        getCartCount,
+        getCartTotal,
+      }}
+    >
+      {children}
+    </CartContext.Provider>
+  );
 };
+
+// ✅ Make sure BOTH exports exist
+export const useCart = () => useContext(CartContext);

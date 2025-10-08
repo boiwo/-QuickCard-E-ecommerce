@@ -1,3 +1,4 @@
+
 import { Link } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext';
 import { useAuth } from '../context/AuthContext';
@@ -5,7 +6,7 @@ import ProductCard from '../components/ProductCard';
 
 const Wishlist = () => {
   const { user } = useAuth();
-  const { wishlistItems, loading } = useWishlist();
+  const { wishlist, loading } = useWishlist(); // renamed to match context
 
   if (!user) {
     return (
@@ -29,7 +30,7 @@ const Wishlist = () => {
     );
   }
 
-  if (wishlistItems.length === 0) {
+  if (!wishlist || wishlist.length === 0) {
     return (
       <div className="container">
         <div className="empty-wishlist">
@@ -48,11 +49,13 @@ const Wishlist = () => {
     <div className="wishlist-page">
       <div className="container">
         <h1>My Wishlist</h1>
-        <p className="wishlist-count">{wishlistItems.length} item{wishlistItems.length !== 1 ? 's' : ''}</p>
+        <p className="wishlist-count">
+          {wishlist.length} item{wishlist.length !== 1 ? 's' : ''}
+        </p>
 
         <div className="products-grid">
-          {wishlistItems.map((item) => (
-            <ProductCard key={item.id} product={item.products} />
+          {wishlist.map((item) => (
+            <ProductCard key={item.id} product={item} />
           ))}
         </div>
       </div>

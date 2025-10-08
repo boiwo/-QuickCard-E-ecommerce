@@ -9,55 +9,39 @@ const ProductCard = ({ product }) => {
 
   const handleAddToCart = (e) => {
     e.preventDefault();
-    addToCart(product.id);
+    addToCart(product);
   };
 
   const handleWishlistToggle = (e) => {
     e.preventDefault();
-    if (inWishlist) {
-      removeFromWishlist(product.id);
-    } else {
-      addToWishlist(product.id);
-    }
+    inWishlist ? removeFromWishlist(product.id) : addToWishlist(product);
   };
 
-  const images = Array.isArray(product.images) ? product.images : [];
-  const imageUrl = images.length > 0 ? images[0] : 'https://via.placeholder.com/300';
+  const imageUrl = product.image_url || 'https://via.placeholder.com/300';
 
   return (
     <div className="product-card">
-      <Link to={`/product/${product.slug}`}>
+      <Link to={`/product/${product.id}`}>
         <div className="product-image">
           <img src={imageUrl} alt={product.name} loading="lazy" />
           <button
             className={`wishlist-btn ${inWishlist ? 'active' : ''}`}
             onClick={handleWishlistToggle}
-            title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
           >
             {inWishlist ? '❤️' : '🤍'}
           </button>
         </div>
+
         <div className="product-info">
-          <h3 className="product-name">{product.name}</h3>
-          <p className="product-description">{product.short_description}</p>
-          <div className="product-footer">
-            <div className="product-rating">
-              {'⭐'.repeat(Math.round(product.rating))}
-              <span className="rating-value">{product.rating}</span>
-            </div>
-            <div className="product-price">${parseFloat(product.price).toFixed(2)}</div>
-          </div>
-          <div className="product-stock">
-            {product.stock > 0 ? (
-              <span className="in-stock">In Stock ({product.stock})</span>
-            ) : (
-              <span className="out-of-stock">Out of Stock</span>
-            )}
-          </div>
+          <h3>{product.name}</h3>
+          <p>{product.description}</p>
+          <div className="price">${parseFloat(product.price).toFixed(2)}</div>
+          <div>{product.stock > 0 ? 'In Stock' : 'Out of Stock'}</div>
         </div>
       </Link>
+
       <button
-        className="btn btn-primary add-to-cart-btn"
+        className="btn btn-primary"
         onClick={handleAddToCart}
         disabled={product.stock === 0}
       >
@@ -68,3 +52,4 @@ const ProductCard = ({ product }) => {
 };
 
 export default ProductCard;
+

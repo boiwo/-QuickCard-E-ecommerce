@@ -1,115 +1,79 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
 import ProductCard from '../components/ProductCard';
+import { useCart } from '../context/CartContext';
+
+const API_BASE =
+  import.meta.env.MODE === 'development'
+    ? 'http://127.0.0.1:5001/api'
+    : 'https://quickcard-e-ecommerce-2.onrender.com/api';
+
 
 const Shop = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    category: searchParams.get('category') || '',
-    minPrice: searchParams.get('minPrice') || '',
-    maxPrice: searchParams.get('maxPrice') || '',
-    minRating: searchParams.get('minRating') || '',
-    search: searchParams.get('search') || '',
-    sortBy: searchParams.get('sortBy') || 'name'
+    category: '',
+    minPrice: '',
+    maxPrice: '',
+    minRating: '',
+    search: '',
+    sortBy: 'name',
   });
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const itemsPerPage = 12;
+  const [loading, setLoading] = useState(true);
 
+  const { addToCart } = useCart();
+  const [cartMessage, setCartMessage] = useState('');
+
+  // Fetch categories
   useEffect(() => {
-    fetchCategories();
+    fetch(`${API_BASE}/categories`)
+      .then((res) => res.json())
+      .then((data) => setCategories(data))
+      .catch((err) => console.error('Failed to fetch categories:', err));
   }, []);
 
+  // Fetch products when filters or page changes
   useEffect(() => {
     fetchProducts();
   }, [filters, page]);
 
-  const fetchCategories = async () => {
-    const { data } = await supabase
-      .from('categories')
-      .select('*')
-      .order('name');
-
-    if (data) setCategories(data);
-  };
-
   const fetchProducts = async () => {
     setLoading(true);
+    const params = new URLSearchParams();
 
-    let query = supabase
-      .from('products')
-      .select('*', { count: 'exact' });
+    Object.keys(filters).forEach((key) => {
+      if (filters[key]) params.append(key, filters[key]);
+    });
+    params.append('page', page);
+    params.append('limit', 12);
 
-    if (filters.category) {
-      const category = categories.find(c => c.slug === filters.category);
-      if (category) {
-        query = query.eq('category_id', category.id);
-      }
-    }
+    try {
+      const res = await fetch(`${API_BASE}/products?${params.toString()}`);
+      const data = await res.json();
 
-    if (filters.minPrice) {
-      query = query.gte('price', parseFloat(filters.minPrice));
-    }
+      const fetchedProducts = Array.isArray(data)
+        ? data
+        : data.products || [];
 
-    if (filters.maxPrice) {
-      query = query.lte('price', parseFloat(filters.maxPrice));
-    }
-
-    if (filters.minRating) {
-      query = query.gte('rating', parseFloat(filters.minRating));
-    }
-
-    if (filters.search) {
-      query = query.ilike('name', `%${filters.search}%`);
-    }
-
-    switch (filters.sortBy) {
-      case 'price-low':
-        query = query.order('price', { ascending: true });
-        break;
-      case 'price-high':
-        query = query.order('price', { ascending: false });
-        break;
-      case 'rating':
-        query = query.order('rating', { ascending: false });
-        break;
-      default:
-        query = query.order('name', { ascending: true });
-    }
-
-    const start = (page - 1) * itemsPerPage;
-    const end = start + itemsPerPage - 1;
-    query = query.range(start, end);
-
-    const { data, count } = await query;
-
-    if (data) {
       if (page === 1) {
-        setProducts(data);
+        setProducts(fetchedProducts);
       } else {
-        setProducts(prev => [...prev, ...data]);
+        setProducts((prev) => [...prev, ...fetchedProducts]);
       }
-      setHasMore(data.length === itemsPerPage && (start + data.length) < count);
+
+      setHasMore(data.has_more ?? false);
+    } catch (err) {
+      console.error('Error fetching products:', err);
     }
 
     setLoading(false);
   };
 
   const handleFilterChange = (key, value) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
+    setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1);
-    setProducts([]);
-
-    const params = {};
-    Object.keys(newFilters).forEach(k => {
-      if (newFilters[k]) params[k] = newFilters[k];
-    });
-    setSearchParams(params);
   };
 
   const clearFilters = () => {
@@ -119,136 +83,114 @@ const Shop = () => {
       maxPrice: '',
       minRating: '',
       search: '',
-      sortBy: 'name'
+      sortBy: 'name',
     });
     setPage(1);
-    setProducts([]);
-    setSearchParams({});
   };
 
-  const loadMore = () => {
-    setPage(prev => prev + 1);
+  const loadMore = () => setPage((prev) => prev + 1);
+
+  // Add to cart handler for Shop page
+  const handleAddToCart = async (productId) => {
+    await addToCart(productId);
+    setCartMessage('Product added to cart!');
+    setTimeout(() => setCartMessage(''), 2000);
   };
 
   return (
     <div className="shop-page">
       <div className="container">
-        <div className="shop-header">
-          <h1>Shop All Products</h1>
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-            />
-          </div>
+        <h1 className="shop-title" style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '1.5rem', textAlign: 'center', color: '#2d3748' }}>Shop All Products</h1>
+
+        {/* Cart message notification */}
+        {cartMessage && (
+          <div className="cart-message success" style={{ background: '#38a169', color: '#fff', padding: '0.75rem 1.5rem', borderRadius: '6px', marginBottom: '1rem', textAlign: 'center', fontWeight: 'bold' }}>{cartMessage}</div>
+        )}
+
+        {/* Filter Section */}
+        <div className="shop-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'center', marginBottom: '2rem', background: '#f7fafc', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #cbd5e0', minWidth: '200px', fontSize: '1rem' }}
+          />
+
+          <select
+            value={filters.category}
+            onChange={(e) => handleFilterChange('category', e.target.value)}
+            style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #cbd5e0', fontSize: '1rem' }}
+          >
+            <option value="">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.name}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="Min Price"
+            value={filters.minPrice}
+            onChange={(e) => handleFilterChange('minPrice', e.target.value)}
+            style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #cbd5e0', width: '120px', fontSize: '1rem' }}
+          />
+          <input
+            type="number"
+            placeholder="Max Price"
+            value={filters.maxPrice}
+            onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
+            style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #cbd5e0', width: '120px', fontSize: '1rem' }}
+          />
+
+          <select
+            value={filters.minRating}
+            onChange={(e) => handleFilterChange('minRating', e.target.value)}
+            style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #cbd5e0', fontSize: '1rem' }}
+          >
+            <option value="">Any Rating</option>
+            <option value="4">4+ stars</option>
+            <option value="3">3+ stars</option>
+            <option value="2">2+ stars</option>
+            <option value="1">1+ stars</option>
+          </select>
+
+          <select
+            value={filters.sortBy}
+            onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+            style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #cbd5e0', fontSize: '1rem' }}
+          >
+            <option value="name">Name</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="rating">Rating</option>
+          </select>
+
+          <button onClick={clearFilters} style={{ padding: '0.5rem 1.5rem', borderRadius: '6px', background: '#3182ce', color: '#fff', fontWeight: 'bold', border: 'none', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 1px 4px rgba(49,130,206,0.08)' }}>Clear All Filters</button>
         </div>
 
-        <div className="shop-content">
-          <aside className="filters-sidebar">
-            <div className="filter-section">
-              <h3>Filters</h3>
-              <button className="btn btn-secondary btn-small" onClick={clearFilters}>
-                Clear All
+        {/* Products */}
+        {loading && page === 1 ? (
+          <p>Loading...</p>
+        ) : products.length === 0 ? (
+          <p>No products found.</p>
+        ) : (
+          <>
+            <div className="products-grid">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+              ))}
+            </div>
+
+            {hasMore && (
+              <button onClick={loadMore} disabled={loading}>
+                {loading ? 'Loading...' : 'Load More'}
               </button>
-            </div>
-
-            <div className="filter-section">
-              <h4>Category</h4>
-              <select
-                value={filters.category}
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-              >
-                <option value="">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.slug}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="filter-section">
-              <h4>Price Range</h4>
-              <div className="price-inputs">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={filters.minPrice}
-                  onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-                />
-                <span>-</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={filters.maxPrice}
-                  onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="filter-section">
-              <h4>Minimum Rating</h4>
-              <select
-                value={filters.minRating}
-                onChange={(e) => handleFilterChange('minRating', e.target.value)}
-              >
-                <option value="">Any Rating</option>
-                <option value="4">4+ Stars</option>
-                <option value="3">3+ Stars</option>
-                <option value="2">2+ Stars</option>
-                <option value="1">1+ Stars</option>
-              </select>
-            </div>
-
-            <div className="filter-section">
-              <h4>Sort By</h4>
-              <select
-                value={filters.sortBy}
-                onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-              >
-                <option value="name">Name</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="rating">Rating</option>
-              </select>
-            </div>
-          </aside>
-
-          <div className="products-area">
-            {loading && page === 1 ? (
-              <div className="loading-container">
-                <div className="loading-spinner"></div>
-                <p>Loading products...</p>
-              </div>
-            ) : products.length === 0 ? (
-              <div className="no-products">
-                <p>No products found matching your criteria.</p>
-              </div>
-            ) : (
-              <>
-                <div className="products-grid">
-                  {products.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-                </div>
-
-                {hasMore && (
-                  <div className="load-more">
-                    <button
-                      className="btn btn-primary"
-                      onClick={loadMore}
-                      disabled={loading}
-                    >
-                      {loading ? 'Loading...' : 'Load More'}
-                    </button>
-                  </div>
-                )}
-              </>
             )}
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
